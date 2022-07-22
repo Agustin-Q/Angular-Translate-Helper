@@ -11,7 +11,7 @@ const targetHtmlFile = fs.readFileSync(targetHtmlFilePath, {
 });
 
 // matchea todo lo que esta entre tags
-const matchInBetweenTagsRegex = />(?=[^<\s])((.|\s)*?)</g;
+const matchInBetweenTagsRegex = />\s*(?=[^<\s])([^>]*?)</g;
 let matches = targetHtmlFile.match(matchInBetweenTagsRegex);
 console.log("matches", matches);
 
