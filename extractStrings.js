@@ -98,7 +98,8 @@ prompt.get(schema, (err, result) => {
   // generar lo que va en el json
   let finalKeys = {};
   for (let key in result) {
-    finalKeys[result[key]] = keys[key].value;
+    // lo agregamos si no es skipCode
+    if (result[key] !== skipCode) finalKeys[result[key]] = keys[key].value;
   }
 
   //escribo al html si option es w
