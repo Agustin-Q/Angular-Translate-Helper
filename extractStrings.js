@@ -1,53 +1,56 @@
-let fs = require("fs");
-var prompt = require("prompt");
+const fs = require("fs");
+const prompt = require("prompt");
+const { v4: uuidv4 } = require("uuid");
 
 const targetHtmlFilePath = process.argv[2];
 const prefix = process.argv[3];
 const option = process.argv[4];
+const skipCode = "Q";
 console.log("target Html File Path: ", targetHtmlFilePath);
 console.log("prefix:", prefix);
 const targetHtmlFile = fs.readFileSync(targetHtmlFilePath, {
   encoding: "UTF-8",
 });
 
-// matchea todo lo que esta entre tags
+// machea todo lo que esta entre tags
 const matchInBetweenTagsRegex = />\s*(?=[^<\s])([^>]*?)</g;
 let matches = targetHtmlFile.match(matchInBetweenTagsRegex);
 console.log("matches", matches);
 
-const interploationRegex = /{{.+}}/g;
+const interpolationRegex = /{{.+}}/g;
 let counter = 0;
 let keys = {};
-let repleacedHtmlFile = targetHtmlFile.replace(
+let replacedHtmlFile = targetHtmlFile.replace(
   matchInBetweenTagsRegex,
   (matched, p1) => {
-    if (matched.search(interploationRegex) == -1) {
+    if (matched.search(interpolationRegex) == -1) {
       counter++;
       //console.log("counter", counter);
-      let newKey = `${prefix}KEY${counter}`;
-      keys[newKey] = p1.replace(/\s+/g, " "); // si hay mucho white space lo cambio por uno solo espacio
-      return `> {{ '${newKey}' | translate }} <`;
+      let newKey = uuidv4();
+      keys[newKey] = { value: p1.replace(/\s+/g, " "), type: "HTML" }; // si hay mucho white space lo cambio por uno solo espacio y lo meto el el objeto
+      return `>${newKey}<`; // lo reemplazo en el archivo por un uuid
     } else {
+      // si tiene una interpolación no lo tocamos
       return matched;
     }
   }
 );
 
-// busca y reemplaza attributos
+// busca y reemplaza atributos
 let replaceAttributes = ["placeholder", "title"];
 const matchHtmlAttributes = /(?<=<\w+[\s\S]*)(?:([\w-]+)="(.*?)")/g;
-repleacedHtmlFile = repleacedHtmlFile.replace(
+replacedHtmlFile = replacedHtmlFile.replace(
   matchHtmlAttributes,
   (matched, p1, p2) => {
     if (
-      matched.search(interploationRegex) == -1 &&
+      matched.search(interpolationRegex) == -1 &&
       replaceAttributes.includes(p1)
     ) {
       counter++;
       //console.log("counter", counter);
-      let newKey = `${prefix}KEY${counter}`;
-      keys[newKey] = p2.replace(/\s+/g, " "); // si hay mucho white space lo cambio por uno solo espacio
-      return `${p1}="{{ '${newKey}' | translate }}"`;
+      let newKey = uuidv4();
+      keys[newKey] = { value: p2.replace(/\s+/g, " "), type: "ATTRIBUTE" }; // si hay mucho white space lo cambio por uno solo espacio
+      return `${p1}="${newKey}"`;
     } else {
       return matched;
     }
@@ -64,31 +67,49 @@ prompt.start();
 prompt.get(schema, (err, result) => {
   //console.log("resultado de las preguntas");
   for (let key in result) {
-    if (!result[key].startsWith(prefix)) result[key] = prefix + result[key];
+    // si no tiene el prefijo y no es skipCode se lo agregamos
+    if (!result[key].startsWith(prefix) && result[key] !== skipCode)
+      result[key] = prefix + result[key];
   }
-  //console.log("result", result);
-
-  // REEMPLAZAR con los nuevos keys
+  console.log("result", result);
+  // REEMPLAZAR en el archivo
 
   for (let key in result) {
-    repleacedHtmlFile = repleacedHtmlFile.replace(key, result[key]);
+    // reemplazo con lo original si era skip code
+    if (result[key] === skipCode) {
+      replacedHtmlFile = replacedHtmlFile.replace(key, keys[key].value); // podríamos usar mejores nombres
+    } else {
+      let replaceVale = "";
+      switch (keys[key].type) {
+        case "HTML":
+          replaceVale = `{{ '${result[key]}' | translate }}`;
+          break;
+        case "ATTRIBUTE":
+          replaceVale = `{{ '${result[key]}' | translate }}`;
+          break;
+        default:
+          replaceVale = `{{ '${result[key]}' | translate }}`;
+          break;
+      }
+      replacedHtmlFile = replacedHtmlFile.replace(key, replaceVale);
+    }
   }
 
   // generar lo que va en el json
   let finalKeys = {};
   for (let key in result) {
-    finalKeys[result[key]] = keys[key];
+    finalKeys[result[key]] = keys[key].value;
   }
 
   //escribo al html si option es w
   if (option === "w") {
     console.log("Writing to file: " + targetHtmlFilePath);
-    fs.writeFileSync(targetHtmlFilePath, repleacedHtmlFile, {
+    fs.writeFileSync(targetHtmlFilePath, replacedHtmlFile, {
       encoding: "UTF-8",
     });
   } else if (option === "p") {
     console.log("output:");
-    console.log(repleacedHtmlFile);
+    console.log(replacedHtmlFile);
   } else {
     console.log("File not written.");
   }
@@ -106,9 +127,12 @@ function uniq(a) {
 
 function createSchemaForPrompt(keys) {
   let schema = { properties: {} };
+  let count = 0;
+  let length = Object.getOwnPropertyNames(keys).length;
   for (let key in keys) {
+    count++;
     schema.properties[key] = {
-      description: `Set property for "${keys[key]}"`,
+      description: `[${count}/${length}] Set property for "${keys[key].value}"\nNew Key (Enter ${skipCode} to skip)`,
       default: key,
       pattern: /^[\w._-]*$/,
       message: "Only alphanumeric characters, '-', '_' and '.' are allowed.",
