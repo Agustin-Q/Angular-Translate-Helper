@@ -13,7 +13,7 @@ const targetHtmlFile = fs.readFileSync(targetHtmlFilePath, {
 });
 
 // machea todo lo que esta entre tags
-const matchInBetweenTagsRegex = />\s*(?=[^<\s])([^>]*?)</g;
+const matchInBetweenTagsRegex = /(>\s*)(?=[^<\s])([^>]*?)(\s*<)/g;
 let matches = targetHtmlFile.match(matchInBetweenTagsRegex);
 console.log("matches", matches);
 
@@ -22,11 +22,11 @@ let counter = 0;
 let keys = {};
 let replacedHtmlFile = targetHtmlFile.replace(
   matchInBetweenTagsRegex,
-  (matched, p1) => {
+  (matched, p1, p2, p3) => {
     if (matched.search(interpolationRegex) == -1) {
       counter++;
       //console.log("counter", counter);
-      let val = p1.replace(/\s+/g, " ");
+      let val = p2.replace(/\s+/g, " ");
       let newKey = checkInKeys(keys, val);
       if (newKey) {
         // si ya existe el mismo string sumamos en count para contar cuantas veces lo vimos
@@ -36,7 +36,7 @@ let replacedHtmlFile = targetHtmlFile.replace(
         newKey = uuidv4(); // si ya esta uso el mismo id sino genero uno nuevo
         keys[newKey] = { value: val, type: "HTML", count: 1 }; // si hay mucho white space lo cambio por uno solo espacio y lo meto el el objeto
       }
-      return `>${newKey}<`; // lo reemplazo en el archivo por un uuid
+      return `${p1}${newKey}${p3}`; // lo reemplazo en el archivo por un uuid
     } else {
       // si tiene una interpolación no lo tocamos
       return matched;
