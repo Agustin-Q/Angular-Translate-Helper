@@ -26,8 +26,16 @@ let replacedHtmlFile = targetHtmlFile.replace(
     if (matched.search(interpolationRegex) == -1) {
       counter++;
       //console.log("counter", counter);
-      let newKey = uuidv4();
-      keys[newKey] = { value: p1.replace(/\s+/g, " "), type: "HTML" }; // si hay mucho white space lo cambio por uno solo espacio y lo meto el el objeto
+      let val = p1.replace(/\s+/g, " ");
+      let newKey = checkInKeys(keys, val);
+      if (newKey) {
+        // si ya existe el mismo string sumamos en count para contar cuantas veces lo vimos
+        keys[newKey].count++;
+      } else {
+        // si no existe el mismo string
+        newKey = uuidv4(); // si ya esta uso el mismo id sino genero uno nuevo
+        keys[newKey] = { value: val, type: "HTML", count: 1 }; // si hay mucho white space lo cambio por uno solo espacio y lo meto el el objeto
+      }
       return `>${newKey}<`; // lo reemplazo en el archivo por un uuid
     } else {
       // si tiene una interpolación no lo tocamos
@@ -77,7 +85,7 @@ prompt.get(schema, (err, result) => {
   for (let key in result) {
     // reemplazo con lo original si era skip code
     if (result[key] === skipCode) {
-      replacedHtmlFile = replacedHtmlFile.replace(key, keys[key].value); // podríamos usar mejores nombres
+      replacedHtmlFile = replacedHtmlFile.replaceAll(key, keys[key].value); // podríamos usar mejores nombres
     } else {
       let replaceVale = "";
       switch (keys[key].type) {
@@ -91,7 +99,7 @@ prompt.get(schema, (err, result) => {
           replaceVale = `{{ '${result[key]}' | translate }}`;
           break;
       }
-      replacedHtmlFile = replacedHtmlFile.replace(key, replaceVale);
+      replacedHtmlFile = replacedHtmlFile.replaceAll(key, replaceVale);
     }
   }
 
@@ -133,11 +141,25 @@ function createSchemaForPrompt(keys) {
   for (let key in keys) {
     count++;
     schema.properties[key] = {
-      description: `[${count}/${length}] Set property for "${keys[key].value}"\nNew Key (Enter ${skipCode} to skip)`,
+      description: `[${count}/${length}] [Occurrences: ${
+        keys[key].count || 1
+      }] Set property for "${
+        keys[key].value
+      }"\nNew Key (Enter ${skipCode} to skip)`,
       default: key,
       pattern: /^[\w._-]*$/,
       message: "Only alphanumeric characters, '-', '_' and '.' are allowed.",
     };
   }
   return schema;
+}
+
+// esta función se fija si en keys ya hay un valor idéntico y devuelve el key del valor
+// sino devuelve undefined
+function checkInKeys(keys, value) {
+  let result = undefined;
+  Object.getOwnPropertyNames(keys).forEach((key) => {
+    if (keys[key].value === value) result = key;
+  });
+  return result;
 }
