@@ -18,24 +18,13 @@ let matches = targetHtmlFile.match(matchInBetweenTagsRegex);
 //matches.forEach((match) => console.log(match));
 
 const interpolationRegex = /{{[\s\S]+?}}/g;
-let counter = 0;
 let keys = {};
 let replacedHtmlFile = targetHtmlFile.replace(
   matchInBetweenTagsRegex,
   (matched, p1, p2, p3) => {
     if (matched.search(interpolationRegex) == -1) {
-      counter++;
-      //console.log("counter", counter);
       let val = p2.replace(/\s+/g, " "); // si hay mucho white space lo cambio por uno solo espacio y lo meto el el objeto
-      let newKey = checkInKeys(keys, val);
-      if (newKey) {
-        // si ya existe el mismo string sumamos en count para contar cuantas veces lo vimos
-        keys[newKey].count++;
-      } else {
-        // si no existe el mismo string
-        newKey = uuidv4(); // si ya esta uso el mismo id sino genero uno nuevo
-        keys[newKey] = { value: val, type: "HTML", count: 1 };
-      }
+      let newKey = addToKeys(keys, val, "ATTRIBUTE");
       return `${p1}${newKey}${p3}`; // lo reemplazo en el archivo por un uuid
     } else {
       // si tiene una interpolación no lo tocamos
@@ -54,10 +43,8 @@ replacedHtmlFile = replacedHtmlFile.replace(
       matched.search(interpolationRegex) == -1 &&
       replaceAttributes.includes(p1)
     ) {
-      counter++;
-      //console.log("counter", counter);
-      let newKey = uuidv4();
-      keys[newKey] = { value: p2.replace(/\s+/g, " "), type: "ATTRIBUTE" }; // si hay mucho white space lo cambio por uno solo espacio
+      let val = p2.replace(/\s+/g, " "); // si hay mucho white space lo cambio por uno solo espacio
+      let newKey = addToKeys(keys, val, "ATTRIBUTE");
       return `${p1}="${newKey}"`;
     } else {
       return matched;
@@ -169,4 +156,18 @@ function checkInKeys(keys, value) {
     if (keys[key].value === value) result = key;
   });
   return result;
+}
+
+//agrega el valor al los keys y devuelve el uuid con el que lo agrego
+function addToKeys(keys, val, type) {
+  let newKey = checkInKeys(keys, val);
+  if (newKey) {
+    // si ya existe el mismo string sumamos en count para contar cuantas veces lo vimos
+    keys[newKey].count++;
+  } else {
+    // si no existe el mismo string
+    newKey = uuidv4(); // si ya esta uso el mismo id sino genero uno nuevo
+    keys[newKey] = { value: val, type: type, count: 1 };
+  }
+  return newKey;
 }
