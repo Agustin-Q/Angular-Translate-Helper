@@ -15,9 +15,9 @@ const targetHtmlFile = fs.readFileSync(targetHtmlFilePath, {
 // machea todo lo que esta entre tags
 const matchInBetweenTagsRegex = /(>\s*)(?=[^<\s])([^>]*?)(\s*<)/g;
 let matches = targetHtmlFile.match(matchInBetweenTagsRegex);
-console.log("matches", matches);
+//matches.forEach((match) => console.log(match));
 
-const interpolationRegex = /{{.+}}/g;
+const interpolationRegex = /{{[\s\S]+?}}/g;
 let counter = 0;
 let keys = {};
 let replacedHtmlFile = targetHtmlFile.replace(
@@ -26,7 +26,7 @@ let replacedHtmlFile = targetHtmlFile.replace(
     if (matched.search(interpolationRegex) == -1) {
       counter++;
       //console.log("counter", counter);
-      let val = p2.replace(/\s+/g, " ");
+      let val = p2.replace(/\s+/g, " "); // si hay mucho white space lo cambio por uno solo espacio y lo meto el el objeto
       let newKey = checkInKeys(keys, val);
       if (newKey) {
         // si ya existe el mismo string sumamos en count para contar cuantas veces lo vimos
@@ -34,7 +34,7 @@ let replacedHtmlFile = targetHtmlFile.replace(
       } else {
         // si no existe el mismo string
         newKey = uuidv4(); // si ya esta uso el mismo id sino genero uno nuevo
-        keys[newKey] = { value: val, type: "HTML", count: 1 }; // si hay mucho white space lo cambio por uno solo espacio y lo meto el el objeto
+        keys[newKey] = { value: val, type: "HTML", count: 1 };
       }
       return `${p1}${newKey}${p3}`; // lo reemplazo en el archivo por un uuid
     } else {
@@ -64,8 +64,15 @@ replacedHtmlFile = replacedHtmlFile.replace(
     }
   }
 );
-
+// imprimimos algunas estadisticas
 //console.log("keys", keys);
+let numberOfMatches = 0;
+Object.getOwnPropertyNames(keys).forEach((prop) => {
+  numberOfMatches += keys[prop].count ?? 1;
+});
+console.log("Number of Matches", numberOfMatches);
+console.log("Unique Strings: ", Object.getOwnPropertyNames(keys).length);
+
 let schema = createSchemaForPrompt(keys);
 //console.log("schema", schema);
 
